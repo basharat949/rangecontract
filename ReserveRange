@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface ILaunchpadNFT {
+    // return max supply config for launchpad, if no reserved will be collection's max supply
+    function getMaxLaunchpadSupply() external view returns (uint256);
+
+    // return current launchpad supply
+    function getLaunchpadSupply() external view returns (uint256);
+
+    // this function need to restrict mint permission to launchpad contract
+    function mintTo(address to, uint256 size) external;
+}
+
+contract CGT_LV_SINGLE is ERC721Enumerable, Ownable {
+
+    uint256 public PRE_MINT_SUPPLY;
+    uint256 public PRE_MINT_MAX_SPPLY = 2500;
+
+    uint256 public LAUNCH_MAX_SUPPLY = 500; // max launch supply
+    uint256 public LAUNCH_SUPPLY; // current launch supply (mint on Galler.io)
+
+    address public LAUNCHPAD;
+
+    string _baseTokenURI = "https://gateway.pinata.cloud/ipfs/QmTR2NX8vkQWxbhyCFimtQuNLEetzhmHLu97NDtQBwE6Ph";
+
+    modifier onlyLaunchpad() {
+        require(LAUNCHPAD != address(0), "launchpad address must set");
+        require(msg.sender == LAUNCHPAD, "must call by launchpad");
+        _;
+    }
+
+    function getMaxLaunchpadSupply() public view returns (uint256) {
+        return LAUNCH_MAX_SUPPLY;
+    }
+
+    function getLaunchpadSupply() public view returns (uint256) {
+        return LAUNCH_SUPPLY;
+    }
+
+    constructor(address launchpad) ERC721("CGT_LV_SINGLE", "CGT_LV_SINGLE") {
+        LAUNCHPAD = launchpad;
+    }
+
+    function changeLaunchPad(address _launchPad) external onlyOwner {
+        require(_launchPad != address(0), "not launchPad");
+        LAUNCHPAD = _launchPad;
+    }
+
+    /**
+     * @dev See {IERC165-supportsInterface}.
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC721Enumerable)
+        returns (bool)
+    {
+        return
+            interfaceId == type(IERC721).interfaceId ||
+            interfaceId == type(IERC721Metadata).interfaceId || 
+            interfaceId == type(IERC165).interfaceId || 
+            interfaceId == type(IERC721Enumerable).interfaceId || 
+            super.supportsInterface(interfaceId);
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function bytesOfBaseURI() public view returns (uint256) {
+        return bytes(_baseURI()).length;
+    }
+
+    function setBaseURI(string memory baseURI) public onlyOwner {
+        _baseTokenURI = baseURI;
+    }
+
+    function setPreMintSupply(uint256 _preMintMaxSupply) public onlyOwner {
+        PRE_MINT_MAX_SPPLY = _preMintMaxSupply;
+    }
+
+    function setLaunchPadMaxSupply(uint256 _launchPadSupply) public onlyOwner {
+        LAUNCH_MAX_SUPPLY = _launchPadSupply;
+    }
+    
+    function preMint(address _user, uint256 _quantity) public onlyOwner {
+        require(_user != address(0), "CG: mint to the zero address");
+        require(_quantity != 0, "GG: Number of tokens cannot be zero");
+
+        require(
+            PRE_MINT_SUPPLY + _quantity <= PRE_MINT_MAX_SPPLY,
+            "CG: pre mint cap reached"
+        );
+
+        for (uint256 i = 1; i <= _quantity; i++) {
+            _safeMint(_user, ERC721Enumerable.totalSupply() + i);
+            PRE_MINT_SUPPLY++;
+        }
+    }
+
+    function mintTo(address to, uint256 size) external onlyLaunchpad {
+        require(to != address(0), "can't mint to empty address");
+        require(size > 0, "size must greater than zero");
+        require(
+            LAUNCH_SUPPLY + size <= LAUNCH_MAX_SUPPLY,
+            "max supply reached"
+        );
+
+        for (uint256 i = 1; i <= size; i++) {
+            _mint(to, ERC721Enumerable.totalSupply() + i);
+            LAUNCH_SUPPLY++;
+        }
+    }
+}
